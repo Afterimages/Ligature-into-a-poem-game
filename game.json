@@ -1,0 +1,9 @@
+
+{
+  "deviceOrientation": "portrait",
+  "window": {
+    "navigationBarTitleText": "连接诗句",
+    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#2c3e50"
+  }
+}
