@@ -16,7 +16,10 @@ export default class Grid {
     this.rows = 6;
     this.cols = 5;
     this.cells = [];
-    this.cellSize = SCREEN_WIDTH / this.cols;
+    this.cellSize = Math.min(
+      (SCREEN_WIDTH / this.cols),
+      ((SCREEN_HEIGHT - 150) / this.rows) // 减去150像素留给顶部和底部的空间
+    );
     this.initGrid();
   }
 
@@ -24,14 +27,17 @@ export default class Grid {
     const characters = GameGlobal.databus.grid;
     this.cells = [];
 
+    // 计算起始位置，使格子矩阵垂直居中
+    const startY = 80; // 顶部留出80像素的空间
+
     for (let row = 0; row < this.rows; row++) {
       for (let col = 0; col < this.cols; col++) {
         const index = row * this.cols + col;
         this.cells.push({
           row,
           col,
-          x: col * this.cellSize,
-          y: row * this.cellSize + 100,
+          x: col * this.cellSize + (SCREEN_WIDTH - this.cols * this.cellSize) / 2,
+          y: row * this.cellSize + startY,
           text: characters[index],
           selected: false,
           matched: false

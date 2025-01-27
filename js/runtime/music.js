@@ -21,57 +21,21 @@ export default class Music {
   constructor() {
     if (instance) return instance;
     instance = this;
-
-    this.bgmAudio = wx.createInnerAudioContext();
-    this.selectAudio = null;
-    this.successAudio = null;
-    this.initAudio();
-
-    this.bgmAudio.loop = true;
-    this.bgmAudio.src = 'audio/bgm.mp3';
-  }
-
-  initAudio() {
-    try {
-      this.selectAudio = wx.createInnerAudioContext();
-      this.successAudio = wx.createInnerAudioContext();
-
-      this.selectAudio.src = 'audio/select.mp3';
-      this.successAudio.src = 'audio/success.mp3';
-    } catch (error) {
-      console.error('Failed to initialize audio:', error);
-    }
   }
 
   playBGM() {
-    this.bgmAudio.play();
+    // 暂时不播放音频
   }
 
   playSelect() {
-    try {
-      if (this.selectAudio) {
-        this.selectAudio.stop();
-        this.selectAudio.play();
-      }
-    } catch (error) {
-      console.error('Failed to play select sound:', error);
-    }
+    // 暂时不播放音频
   }
 
   playSuccess() {
-    try {
-      if (this.successAudio) {
-        this.successAudio.stop();
-        this.successAudio.play();
-      }
-    } catch (error) {
-      console.error('Failed to play success sound:', error);
-    }
+    // 暂时不播放音频
   }
 
   stopAll() {
-    this.bgmAudio.stop();
-    this.selectAudio.stop();
-    this.successAudio.stop();
+    // 暂时不播放音频
   }
 }

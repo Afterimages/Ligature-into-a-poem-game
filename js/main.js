@@ -78,20 +78,15 @@ export default class Main {
   }
 
   onTouchStart(e) {
-    e.preventDefault();
     const touch = e.touches[0];
     const cell = this.grid.getCellByTouch(touch);
     if (cell && cell.text) {
       GameGlobal.databus.addToPath(cell);
       this.grid.updateSelection(GameGlobal.databus.currentPath);
-      if (GameGlobal.musicManager) {
-        GameGlobal.musicManager.playSelect();
-      }
     }
   }
 
   onTouchMove(e) {
-    e.preventDefault();
     const touch = e.touches[0];
     const cell = this.grid.getCellByTouch(touch);
     if (cell && cell.text && !GameGlobal.databus.currentPath.includes(cell)) {
@@ -99,20 +94,13 @@ export default class Main {
       if (this.grid.isAdjacent(lastCell, cell)) {
         GameGlobal.databus.addToPath(cell);
         this.grid.updateSelection(GameGlobal.databus.currentPath);
-        if (GameGlobal.musicManager) {
-          GameGlobal.musicManager.playSelect();
-        }
       }
     }
   }
 
-  onTouchEnd(e) {
-    e.preventDefault();
+  onTouchEnd() {
     if (GameGlobal.databus.checkPathMatch()) {
       this.grid.markMatched(GameGlobal.databus.currentPath);
-      if (GameGlobal.musicManager) {
-        GameGlobal.musicManager.playSuccess();
-      }
     }
     this.grid.updateSelection([]);
     GameGlobal.databus.clearPath();
@@ -167,6 +155,7 @@ export default class Main {
   render() {
     // 游戏结束停止渲染
     if (GameGlobal.databus.isGameOver) {
+      this.gameinfo.render(ctx);
       return;
     }
 
@@ -176,7 +165,7 @@ export default class Main {
     // 渲染网格
     this.grid.render(ctx);
 
-    // 渲染游戏信息
+    // 渲染游戏信息（包括得分）
     this.gameinfo.render(ctx);
   }
 
