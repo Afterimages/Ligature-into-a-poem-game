@@ -23,13 +23,24 @@ export default class Music {
     instance = this;
 
     this.bgmAudio = wx.createInnerAudioContext();
-    this.selectAudio = wx.createInnerAudioContext();
-    this.successAudio = wx.createInnerAudioContext();
+    this.selectAudio = null;
+    this.successAudio = null;
+    this.initAudio();
 
     this.bgmAudio.loop = true;
     this.bgmAudio.src = 'audio/bgm.mp3';
-    this.selectAudio.src = 'audio/select.mp3';
-    this.successAudio.src = 'audio/success.mp3';
+  }
+
+  initAudio() {
+    try {
+      this.selectAudio = wx.createInnerAudioContext();
+      this.successAudio = wx.createInnerAudioContext();
+
+      this.selectAudio.src = 'audio/select.mp3';
+      this.successAudio.src = 'audio/success.mp3';
+    } catch (error) {
+      console.error('Failed to initialize audio:', error);
+    }
   }
 
   playBGM() {
@@ -37,13 +48,25 @@ export default class Music {
   }
 
   playSelect() {
-    this.selectAudio.currentTime = 0;
-    this.selectAudio.play();
+    try {
+      if (this.selectAudio) {
+        this.selectAudio.stop();
+        this.selectAudio.play();
+      }
+    } catch (error) {
+      console.error('Failed to play select sound:', error);
+    }
   }
 
   playSuccess() {
-    this.successAudio.currentTime = 0;
-    this.successAudio.play();
+    try {
+      if (this.successAudio) {
+        this.successAudio.stop();
+        this.successAudio.play();
+      }
+    } catch (error) {
+      console.error('Failed to play success sound:', error);
+    }
   }
 
   stopAll() {

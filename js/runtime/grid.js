@@ -22,16 +22,17 @@ export default class Grid {
 
   initGrid() {
     const characters = GameGlobal.databus.grid;
-    let charIndex = 0;
+    this.cells = [];
 
     for (let row = 0; row < this.rows; row++) {
       for (let col = 0; col < this.cols; col++) {
+        const index = row * this.cols + col;
         this.cells.push({
           row,
           col,
           x: col * this.cellSize,
           y: row * this.cellSize + 100,
-          text: characters[charIndex++] || '空',
+          text: characters[index],
           selected: false,
           matched: false
         });
@@ -66,11 +67,27 @@ export default class Grid {
     });
   }
 
+  isAdjacent(cell1, cell2) {
+    if (!cell1 || !cell2) return false;
+    const rowDiff = Math.abs(cell1.row - cell2.row);
+    const colDiff = Math.abs(cell1.col - cell2.col);
+    return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+  }
+
   render(ctx) {
+    // 确保canvas上下文存在
+    if (!ctx) return;
+
+    // 清除画布
+    ctx.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    
+    // 绘制背景
     ctx.fillStyle = '#f0f0f0';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
+    // 绘制每个格子
     this.cells.forEach(cell => {
+      // 设置格子背景色
       if (cell.matched) {
         ctx.fillStyle = '#90EE90';
       } else if (cell.selected) {
@@ -79,25 +96,31 @@ export default class Grid {
         ctx.fillStyle = '#ffffff';
       }
       
+      // 绘制格子背景
+      ctx.fillRect(cell.x, cell.y, this.cellSize, this.cellSize);
+      
+      // 绘制格子边框
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 1;
-      
-      ctx.fillRect(cell.x, cell.y, this.cellSize, this.cellSize);
       ctx.strokeRect(cell.x, cell.y, this.cellSize, this.cellSize);
       
-      ctx.fillStyle = cell.matched ? '#006400' : '#000000';
-      ctx.font = '24px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(
-        cell.text,
-        cell.x + this.cellSize / 2,
-        cell.y + this.cellSize / 2
-      );
+      // 绘制文字
+      if (cell.text) {
+        ctx.fillStyle = cell.matched ? '#006400' : '#000000';
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(
+          cell.text,
+          cell.x + this.cellSize / 2,
+          cell.y + this.cellSize / 2
+        );
+      }
     });
 
+    // 绘制选择路径
     const currentPath = GameGlobal.databus.currentPath;
-    if (currentPath.length > 1) {
+    if (currentPath && currentPath.length > 1) {
       ctx.beginPath();
       ctx.moveTo(
         currentPath[0].x + this.cellSize / 2,

@@ -67,18 +67,120 @@ export default class DataBus {
   }
 
   initGridData() {
-    // 将诗句打散成单字
-    const characters = this.poems.reduce((acc, poem) => {
-      return acc.concat(poem.content.split(''));
-    }, []);
+    // 将诗句打散成单字，并过滤掉标点符号
+    const poems = this.poems.map(poem => ({
+      ...poem,
+      chars: poem.content.split('').filter(char => !/[，。、？！；：]/.test(char))
+    }));
 
-    // 随机打乱字符顺序
-    for (let i = characters.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [characters[i], characters[j]] = [characters[j], characters[i]];
+    // 初始化空网格
+    this.grid = new Array(6 * 5).fill(null);
+    
+    // 为每首诗找到合适的位置
+    poems.forEach(poem => {
+      let maxAttempts = 100; // 添加最大尝试次数限制
+      let placed = false;
+      
+      while (!placed && maxAttempts > 0) {
+        maxAttempts--;
+        // 随机选择起始位置
+        const startRow = Math.floor(Math.random() * 6);
+        const startCol = Math.floor(Math.random() * 5);
+        
+        if (this.canPlacePoem(poem.chars, startRow, startCol)) {
+          this.placePoem(poem.chars, startRow, startCol);
+          placed = true;
+        }
+      }
+
+      // 如果超过最大尝试次数仍未放置成功，使用简单的线性放置
+      if (!placed) {
+        this.placeLinear(poem.chars);
+      }
+    });
+
+    // 填充剩余空格
+    for (let i = 0; i < this.grid.length; i++) {
+      if (this.grid[i] === null) {
+        const additionalChars = '天地人山水风云雨日月星';
+        this.grid[i] = additionalChars[Math.floor(Math.random() * additionalChars.length)];
+      }
+    }
+  }
+
+  // 添加线性放置方法作为后备方案
+  placeLinear(chars) {
+    // 找到第一个空位
+    let startIndex = this.grid.findIndex(cell => cell === null);
+    if (startIndex === -1) return false;
+
+    // 计算起始位置的行列
+    const startRow = Math.floor(startIndex / 5);
+    const startCol = startIndex % 5;
+
+    // 确保有足够的空间放置整个诗句
+    if (startCol + chars.length <= 5) {
+      // 水平放置
+      chars.forEach((char, i) => {
+        this.grid[startIndex + i] = char;
+      });
+    } else {
+      // 垂直放置
+      chars.forEach((char, i) => {
+        if (startRow + i < 6) {
+          this.grid[startIndex + (i * 5)] = char;
+        }
+      });
+    }
+    return true;
+  }
+
+  canPlacePoem(chars, startRow, startCol) {
+    if (this.grid[startRow * 5 + startCol] !== null) {
+      return false;
     }
 
-    this.grid = characters;
+    // 检查是否有足够的相邻空格
+    let availableSpots = this.getAvailableAdjacent(startRow, startCol, []);
+    return availableSpots.length >= chars.length - 1;
+  }
+
+  getAvailableAdjacent(row, col, usedPositions) {
+    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    const available = [];
+
+    directions.forEach(([dRow, dCol]) => {
+      const newRow = row + dRow;
+      const newCol = col + dCol;
+      
+      if (newRow >= 0 && newRow < 6 && 
+          newCol >= 0 && newCol < 5 && 
+          this.grid[newRow * 5 + newCol] === null &&
+          !usedPositions.some(([r, c]) => r === newRow && c === newCol)) {
+        available.push([newRow, newCol]);
+      }
+    });
+
+    return available;
+  }
+
+  placePoem(chars, startRow, startCol) {
+    let currentRow = startRow;
+    let currentCol = startCol;
+    let usedPositions = [[startRow, startCol]];
+    
+    this.grid[startRow * 5 + startCol] = chars[0];
+
+    for (let i = 1; i < chars.length; i++) {
+      const available = this.getAvailableAdjacent(currentRow, currentCol, usedPositions);
+      if (available.length === 0) break;
+
+      const [nextRow, nextCol] = available[Math.floor(Math.random() * available.length)];
+      this.grid[nextRow * 5 + nextCol] = chars[i];
+      usedPositions.push([nextRow, nextCol]);
+      currentRow = nextRow;
+      currentCol = nextCol;
+    }
   }
 
   // 检查是否完成所有诗句

@@ -10,12 +10,17 @@
  *    - 选中路径绘制
  */
 
-GameGlobal.canvas = wx.createCanvas();
+// 获取系统信息
+const systemInfo = wx.getSystemInfoSync();
+const screenWidth = systemInfo.windowWidth;
+const screenHeight = systemInfo.windowHeight;
 
-const windowInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
+// 创建canvas并导出
+export const canvas = wx.createCanvas();
 
-canvas.width = windowInfo.screenWidth;
-canvas.height = windowInfo.screenHeight;
+// 设置canvas尺寸
+canvas.width = screenWidth;
+canvas.height = screenHeight;
 
-export const SCREEN_WIDTH = windowInfo.screenWidth;
-export const SCREEN_HEIGHT = windowInfo.screenHeight;
+export const SCREEN_WIDTH = screenWidth;
+export const SCREEN_HEIGHT = screenHeight;

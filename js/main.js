@@ -11,7 +11,7 @@
  * 3. 协调游戏整体流程
  */
 
-import './render'; // 初始化Canvas
+import { canvas } from './render';  // 导入canvas
 import Player from './player/index'; // 导入玩家类
 import Enemy from './npc/enemy'; // 导入敌机类
 import BackGround from './runtime/background'; // 导入背景类
@@ -21,7 +21,7 @@ import DataBus from './databus'; // 导入数据类，用于管理游戏状态�
 import Grid from './runtime/grid';
 
 const ENEMY_GENERATE_INTERVAL = 30;
-const ctx = canvas.getContext('2d'); // 获取canvas的2D绘图上下文;
+let ctx = null;
 
 GameGlobal.databus = new DataBus(); // 全局数据管理，用于管理游戏状态和数据
 GameGlobal.musicManager = new Music(); // 全局音乐管理实例
@@ -31,59 +31,88 @@ GameGlobal.musicManager = new Music(); // 全局音乐管理实例
  */
 export default class Main {
   constructor() {
+    // 获取canvas上下文
+    if (!ctx) {
+      try {
+        ctx = canvas.getContext('2d');
+      } catch (error) {
+        console.error('Failed to get canvas context:', error);
+        return;
+      }
+    }
+    
     this.aniId = 0;
-    this.bindEvents();
-    this.init();
+    this.restart();
   }
 
-  init() {
+  restart() {
+    this.bindLoop = this.loop.bind(this);
+    
+    // 初始化数据总线
     GameGlobal.databus = new DataBus();
+    
+    // 初始化音乐管理器
     GameGlobal.musicManager = new Music();
     
+    // 初始化游戏网格
     this.grid = new Grid();
+    
+    // 初始化游戏信息
     this.gameinfo = new GameInfo();
     
-    this.start();
+    // 绑定事件
+    this.bindEvents();
+    
+    // 开始游戏循环
+    this.loop();
   }
 
   bindEvents() {
-    wx.onTouchStart(this.onTouchStart.bind(this));
-    wx.onTouchMove(this.onTouchMove.bind(this));
-    wx.onTouchEnd(this.onTouchEnd.bind(this));
-  }
-
-  onTouchStart(e) {
-    const cell = this.grid.getCellByTouch(e.touches[0]);
-    if (cell && cell.text) {  // 只有有文字的格子才能被选中
-      GameGlobal.databus.addToPath(cell);
-      this.grid.updateSelection(GameGlobal.databus.currentPath);
-      GameGlobal.musicManager.playSelect();
+    try {
+      wx.onTouchStart(this.onTouchStart.bind(this));
+      wx.onTouchMove(this.onTouchMove.bind(this));
+      wx.onTouchEnd(this.onTouchEnd.bind(this));
+    } catch (error) {
+      console.error('Failed to bind touch events:', error);
     }
   }
 
-  onTouchMove(e) {
-    const cell = this.grid.getCellByTouch(e.touches[0]);
-    if (cell && !GameGlobal.databus.currentPath.includes(cell)) {
-      const lastCell = GameGlobal.databus.currentPath[GameGlobal.databus.currentPath.length - 1];
-      if (this.isAdjacent(lastCell, cell)) {
-        GameGlobal.databus.addToPath(cell);
-        this.grid.updateSelection(GameGlobal.databus.currentPath);
+  onTouchStart(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const cell = this.grid.getCellByTouch(touch);
+    if (cell && cell.text) {
+      GameGlobal.databus.addToPath(cell);
+      this.grid.updateSelection(GameGlobal.databus.currentPath);
+      if (GameGlobal.musicManager) {
         GameGlobal.musicManager.playSelect();
       }
     }
   }
 
-  isAdjacent(cell1, cell2) {
-    if (!cell1 || !cell2) return false;
-    const rowDiff = Math.abs(cell1.row - cell2.row);
-    const colDiff = Math.abs(cell1.col - cell2.col);
-    return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+  onTouchMove(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const cell = this.grid.getCellByTouch(touch);
+    if (cell && cell.text && !GameGlobal.databus.currentPath.includes(cell)) {
+      const lastCell = GameGlobal.databus.currentPath[GameGlobal.databus.currentPath.length - 1];
+      if (this.grid.isAdjacent(lastCell, cell)) {
+        GameGlobal.databus.addToPath(cell);
+        this.grid.updateSelection(GameGlobal.databus.currentPath);
+        if (GameGlobal.musicManager) {
+          GameGlobal.musicManager.playSelect();
+        }
+      }
+    }
   }
 
-  onTouchEnd() {
+  onTouchEnd(e) {
+    e.preventDefault();
     if (GameGlobal.databus.checkPathMatch()) {
       this.grid.markMatched(GameGlobal.databus.currentPath);
-      GameGlobal.musicManager.playSuccess();
+      if (GameGlobal.musicManager) {
+        GameGlobal.musicManager.playSuccess();
+      }
     }
     this.grid.updateSelection([]);
     GameGlobal.databus.clearPath();
@@ -136,18 +165,36 @@ export default class Main {
   }
 
   render() {
+    // 游戏结束停止渲染
+    if (GameGlobal.databus.isGameOver) {
+      return;
+    }
+
+    // 清空画布
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 渲染网格
     this.grid.render(ctx);
+
+    // 渲染游戏信息
     this.gameinfo.render(ctx);
   }
 
   loop() {
-    this.render();
-    this.aniId = requestAnimationFrame(this.loop.bind(this));
-  }
+    try {
+      // 清除上一帧的动画
+      if (this.aniId) {
+        cancelAnimationFrame(this.aniId);
+        this.aniId = null;
+      }
 
-  start() {
-    this.loop();
+      this.render();
+      this.aniId = window.requestAnimationFrame(this.bindLoop);
+    } catch (error) {
+      console.error('Game loop error:', error);
+      // 发生错误时重启游戏
+      this.restart();
+    }
   }
 
   // 游戏逻辑更新主函数
