@@ -67,15 +67,15 @@ export default class DataBus {
   }
 
   initGridData() {
-    // 将诗句打散成单字，并过滤掉标点符号
+    // 将诗句打散成单字
     const poems = this.poems.map(poem => ({
       ...poem,
       chars: poem.content
-        .split('，') // 先按逗号分割
-        .join('')    // 合并
-        .split('。') // 再按句号分割
-        .join('')    // 合并
-        .split('')   // 最后分割成字符数组
+        .split('，')
+        .join('')
+        .split('。')
+        .join('')
+        .split('')
     }));
 
     // 初始化空网格
@@ -86,40 +86,21 @@ export default class DataBus {
       let maxAttempts = 100;
       let placed = false;
       
-      // 分别放置前半句和后半句
-      const halfLength = Math.floor(poem.chars.length / 2);
-      const firstHalf = poem.chars.slice(0, halfLength);
-      const secondHalf = poem.chars.slice(halfLength);
-
-      // 先尝试放置前半句
       while (!placed && maxAttempts > 0) {
         maxAttempts--;
         const startRow = Math.floor(Math.random() * 6);
         const startCol = Math.floor(Math.random() * 5);
         
-        if (this.canPlacePoem(firstHalf, startRow, startCol)) {
-          this.placePoem(firstHalf, startRow, startCol);
-          placed = true;
-        }
-      }
-
-      // 重置尝试次数，放置后半句
-      maxAttempts = 100;
-      placed = false;
-      while (!placed && maxAttempts > 0) {
-        maxAttempts--;
-        const startRow = Math.floor(Math.random() * 6);
-        const startCol = Math.floor(Math.random() * 5);
-        
-        if (this.canPlacePoem(secondHalf, startRow, startCol)) {
-          this.placePoem(secondHalf, startRow, startCol);
+        // 尝试放置完整的一句诗
+        if (this.canPlacePoemWithAdjacent(poem.chars, startRow, startCol)) {
+          this.placePoemWithAdjacent(poem.chars, startRow, startCol);
           placed = true;
         }
       }
 
       // 如果还没放置成功，使用线性放置
       if (!placed) {
-        this.placeLinear(secondHalf);
+        this.placeLinear(poem.chars);
       }
     });
 
@@ -159,14 +140,72 @@ export default class DataBus {
     return true;
   }
 
-  canPlacePoem(chars, startRow, startCol) {
+  // 检查是否可以放置完整的一句诗，确保上下句相邻
+  canPlacePoemWithAdjacent(chars, startRow, startCol) {
     if (this.grid[startRow * 5 + startCol] !== null) {
       return false;
     }
 
-    // 检查是否有足够的相邻空格
-    let availableSpots = this.getAvailableAdjacent(startRow, startCol, []);
-    return availableSpots.length >= chars.length - 1;
+    const halfLength = Math.floor(chars.length / 2);
+    const positions = [[startRow, startCol]];
+    let currentRow = startRow;
+    let currentCol = startCol;
+
+    // 放置前半句
+    for (let i = 1; i < halfLength; i++) {
+      const available = this.getAvailableAdjacent(currentRow, currentCol, positions);
+      if (available.length === 0) return false;
+      [currentRow, currentCol] = available[0];
+      positions.push([currentRow, currentCol]);
+    }
+
+    // 确保后半句的第一个字与前半句的最后一个字相邻
+    const available = this.getAvailableAdjacent(currentRow, currentCol, positions);
+    if (available.length === 0) return false;
+    [currentRow, currentCol] = available[0];
+    positions.push([currentRow, currentCol]);
+
+    // 放置后半句的剩余部分
+    for (let i = halfLength + 1; i < chars.length; i++) {
+      const available = this.getAvailableAdjacent(currentRow, currentCol, positions);
+      if (available.length === 0) return false;
+      [currentRow, currentCol] = available[0];
+      positions.push([currentRow, currentCol]);
+    }
+
+    return true;
+  }
+
+  // 放置完整的一句诗，确保上下句相邻
+  placePoemWithAdjacent(chars, startRow, startCol) {
+    const halfLength = Math.floor(chars.length / 2);
+    const positions = [[startRow, startCol]];
+    let currentRow = startRow;
+    let currentCol = startCol;
+    
+    this.grid[startRow * 5 + startCol] = chars[0];
+
+    // 放置前半句
+    for (let i = 1; i < halfLength; i++) {
+      const available = this.getAvailableAdjacent(currentRow, currentCol, positions);
+      [currentRow, currentCol] = available[0];
+      this.grid[currentRow * 5 + currentCol] = chars[i];
+      positions.push([currentRow, currentCol]);
+    }
+
+    // 放置后半句，确保与前半句相邻
+    const available = this.getAvailableAdjacent(currentRow, currentCol, positions);
+    [currentRow, currentCol] = available[0];
+    this.grid[currentRow * 5 + currentCol] = chars[halfLength];
+    positions.push([currentRow, currentCol]);
+
+    // 放置后半句的剩余部分
+    for (let i = halfLength + 1; i < chars.length; i++) {
+      const available = this.getAvailableAdjacent(currentRow, currentCol, positions);
+      [currentRow, currentCol] = available[0];
+      this.grid[currentRow * 5 + currentCol] = chars[i];
+      positions.push([currentRow, currentCol]);
+    }
   }
 
   getAvailableAdjacent(row, col, usedPositions) {
@@ -188,25 +227,6 @@ export default class DataBus {
     return available;
   }
 
-  placePoem(chars, startRow, startCol) {
-    let currentRow = startRow;
-    let currentCol = startCol;
-    let usedPositions = [[startRow, startCol]];
-    
-    this.grid[startRow * 5 + startCol] = chars[0];
-
-    for (let i = 1; i < chars.length; i++) {
-      const available = this.getAvailableAdjacent(currentRow, currentCol, usedPositions);
-      if (available.length === 0) break;
-
-      const [nextRow, nextCol] = available[Math.floor(Math.random() * available.length)];
-      this.grid[nextRow * 5 + nextCol] = chars[i];
-      usedPositions.push([nextRow, nextCol]);
-      currentRow = nextRow;
-      currentCol = nextCol;
-    }
-  }
-
   // 检查是否完成所有诗句
   checkGameComplete() {
     if (this.completedPoems.length === this.poems.length) {
@@ -224,7 +244,7 @@ export default class DataBus {
     this.currentPath = [];
   }
 
-  // 检查当前路径是否匹配某个诗句
+  // 检查当前路径是否匹配某个完整诗句
   checkPathMatch() {
     const selectedContent = this.currentPath
       .map(cell => cell.text)
@@ -238,20 +258,15 @@ export default class DataBus {
 
       // 过滤掉标点符号后的诗句内容
       const poemContent = poem.content
-        .split('，') // 先按逗号分割
-        .join('')    // 合并
-        .split('。') // 再按句号分割
-        .join('')    // 合并
-        .split('');  // 最后分割成字符数组
+        .split('，')
+        .join('')
+        .split('。')
+        .join('');
 
-      // 检查是否匹配诗句的前半句或后半句
-      const halfLength = Math.floor(poemContent.length / 2);
-      const firstHalf = poemContent.slice(0, halfLength);
-      const secondHalf = poemContent.slice(halfLength);
-
-      if (selectedContent === firstHalf.join('') || selectedContent === secondHalf.join('')) {
+      // 只有完整匹配整句诗才计分
+      if (selectedContent === poemContent) {
         this.completedPoems.push(poem.id);
-        this.score += 1; // 连出一句诗加一分
+        this.score += 1;
         this.checkGameComplete();
         return true;
       }
