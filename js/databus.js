@@ -81,51 +81,77 @@ export default class DataBus {
       return sum + chars.length;
     }, 0);
 
-    // 设置更大的网格大小，使用固定的宽高比
-    this.cols = 12;  // 增加列数
-    this.rows = 15;  // 增加行数，使网格更高
+    // 根据字数动态计算网格大小
+    const minSize = Math.ceil(Math.sqrt(totalChars * 1.5)); // 增加50%的空间
+    this.cols = Math.max(10, minSize);  // 最小10列
+    this.rows = Math.max(12, minSize + 2);  // 最小12行，比列数多2行
   }
 
   initGridData() {
     try {
-      // 初始化空网格
+      // 初始化空网格，全部填充空格
       this.grid = new Array(this.rows * this.cols).fill(' ');
       
-      // 处理每首诗
-      for (const poem of this.poems) {
-        const chars = poem.content.split('').filter(char => !/[，。、？！；：]/.test(char));
-        
-        // 将诗句分为上下两句
-        const halfLength = Math.floor(chars.length / 2);
-        const firstHalf = chars.slice(0, halfLength);
-        const secondHalf = chars.slice(halfLength);
+      // 记录所有已放置的位置
+      const usedPositions = new Set();
+      let retryCount = 0;
+      const maxRetries = 50;
 
-        let placed = false;
-        let attempts = 0;
-        const maxAttempts = 200;
+      while (retryCount < maxRetries) {
+        // 清空网格重新开始
+        this.grid = new Array(this.rows * this.cols).fill(' ');
+        usedPositions.clear();
+        let allPoemsPlaced = true;
 
-        while (!placed && attempts < maxAttempts) {
-          attempts++;
-          // 随机选择起始位置
-          const startRow = Math.floor(Math.random() * (this.rows - 3));
-          const startCol = Math.floor(Math.random() * (this.cols - 3));
+        // 尝试放置所有诗句
+        for (const poem of this.poems) {
+          const chars = poem.content.split('').filter(char => !/[，。、？！；：]/.test(char));
+          const halfLength = Math.floor(chars.length / 2);
+          const firstHalf = chars.slice(0, halfLength);
+          const secondHalf = chars.slice(halfLength);
 
-          // 尝试放置第一句
-          if (this.canPlaceHalf(firstHalf, startRow, startCol)) {
-            const firstHalfPositions = this.placeHalf(firstHalf, startRow, startCol);
-            const lastPos = firstHalfPositions[firstHalfPositions.length - 1];
-            
-            // 从第一句的最后一个字开始，尝试放置第二句
-            const secondStartPositions = this.getAdjacentPositions(lastPos.row, lastPos.col);
-            
-            for (const pos of secondStartPositions) {
-              if (this.canPlaceHalf(secondHalf, pos.row, pos.col)) {
-                this.placeHalf(secondHalf, pos.row, pos.col);
-                placed = true;
-                break;
+          let placed = false;
+          let attempts = 0;
+          const maxAttempts = 100;
+
+          while (!placed && attempts < maxAttempts) {
+            attempts++;
+            const startRow = Math.floor(Math.random() * (this.rows - 3));
+            const startCol = Math.floor(Math.random() * (this.cols - 3));
+
+            if (this.canPlaceHalf(firstHalf, startRow, startCol)) {
+              const firstHalfPositions = this.placeHalf(firstHalf, startRow, startCol);
+              const lastPos = firstHalfPositions[firstHalfPositions.length - 1];
+              
+              const secondStartPositions = this.getAdjacentPositions(lastPos.row, lastPos.col);
+              
+              for (const pos of secondStartPositions) {
+                if (this.canPlaceHalf(secondHalf, pos.row, pos.col)) {
+                  this.placeHalf(secondHalf, pos.row, pos.col);
+                  placed = true;
+                  firstHalfPositions.forEach(pos => 
+                    usedPositions.add(`${pos.row},${pos.col}`)
+                  );
+                  break;
+                }
               }
             }
           }
+
+          if (!placed) {
+            allPoemsPlaced = false;
+            break;
+          }
+        }
+
+        if (allPoemsPlaced) {
+          // 所有诗句都放置成功，退出循环
+          break;
+        }
+
+        retryCount++;
+        if (retryCount === maxRetries) {
+          console.error('无法放置所有诗句，请调整网格大小或减少诗句数量');
         }
       }
     } catch (error) {
