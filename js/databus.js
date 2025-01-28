@@ -8,17 +8,21 @@ export default class DataBus {
   }
 
   reset() {
-    this.poems = [];
+    this.allPoems = this.initAllPoems();  // 存储所有诗句
+    this.level = 1;  // 当前关卡
+    this.poems = [];  // 当前关卡的诗句
     this.grid = [];
     this.currentPath = [];
     this.completedPoems = [];
-    this.score = 0;
+    this.score = 0;  // 总分
+    this.currentLevelScore = 0;  // 当前关卡得分
     this.isGameOver = false;
-    this.initPoems();
+    this.usedPoemIds = new Set();  // 记录已使用过的诗句ID
+    this.initLevel();  // 初始化当前关卡
   }
 
-  initPoems() {
-    this.poems = [
+  initAllPoems() {
+    return [
       {
         id: 1,
         title: '静夜思',
@@ -230,10 +234,53 @@ export default class DataBus {
         content: '君不见黄河之水天上来，奔流到海不复回。'
       }
     ];
+  }
 
-    // 计算所需的网格大小
+  initLevel() {
+    // 每关显示的诗句数量
+    const poemsPerLevel = {
+      1: 4,
+      2: 5,
+      3: 6,
+      4: 7,
+      5: 8
+    };
+
+    // 获取当前关卡应显示的诗句数量
+    const count = poemsPerLevel[this.level] || 4;
+    
+    // 完全重置所有状态
+    this.grid = null;  // 先设为null以确保完全清除
+    this.currentPath = [];
+    this.completedPoems = [];
+    this.currentLevelScore = 0;
+    this.poems = [];  // 清空当前诗句
+    
+    // 随机选择未使用过的诗句
+    let availablePoems = this.allPoems.filter(poem => !this.usedPoemIds.has(poem.id));
+    if (availablePoems.length < count) {
+      this.usedPoemIds.clear();
+      availablePoems = [...this.allPoems];
+    }
+    
+    // 随机选择诗句
+    const shuffled = [...availablePoems].sort(() => Math.random() - 0.5);
+    this.poems = shuffled.slice(0, count);
+    
+    // 记录使用的诗句
+    this.poems.forEach(poem => this.usedPoemIds.add(poem.id));
+
+    // 重新计算网格大小
     this.calculateGridSize();
+    
+    // 强制重新初始化网格数据
+    this.grid = new Array(this.rows * this.cols).fill(' ');
     this.initGridData();
+
+    // 强制重新渲染
+    if (GameGlobal.grid) {
+      GameGlobal.grid.initGrid();
+    }
   }
 
   calculateGridSize() {
@@ -254,273 +301,102 @@ export default class DataBus {
       // 初始化空网格
       this.grid = new Array(this.rows * this.cols).fill(' ');
       
-      const usedPositions = new Set();
       let retryCount = 0;
-      const maxRetries = 200;  // 增加重试次数
+      const maxRetries = 50;
 
       while (retryCount < maxRetries) {
+        // 每次尝试都重新初始化网格和打乱诗句
         this.grid = new Array(this.rows * this.cols).fill(' ');
-        usedPositions.clear();
-        let allPoemsPlaced = true;
-
-        // 随机打乱诗句顺序
-        const shuffledPoems = [...this.poems]
-          .sort(() => Math.random() - 0.5);
+        const shuffledPoems = [...this.poems].sort(() => Math.random() - 0.5);
+        let allPlaced = true;
 
         for (const poem of shuffledPoems) {
           const chars = poem.content.split('').filter(char => !/[，。、？！；：]/.test(char));
-          let placed = false;
-
-          // 随机尝试多个起始位置
-          const startPositions = this.getRandomStartPositions();
           
-          for (const {row, col} of startPositions) {
-            if (this.tryPlacePoemInDirection(chars, row, col, [0, 1], [1, 0], usedPositions)) {
-              placed = true;
-              break;
+          // 尝试在不同位置放置诗句
+          let placed = false;
+          for (let row = 0; row < this.rows && !placed; row++) {
+            for (let col = 0; col < this.cols && !placed; col++) {
+              if (this.grid[row * this.cols + col] === ' ') {
+                if (this.tryPlacePoem(chars, row, col)) {
+                  placed = true;
+                }
+              }
             }
           }
 
           if (!placed) {
-            allPoemsPlaced = false;
+            allPlaced = false;
             break;
           }
         }
 
-        if (allPoemsPlaced) break;
+        if (allPlaced) {
+          return;  // 所有诗句都放置成功
+        }
         retryCount++;
+      }
+
+      if (retryCount === maxRetries) {
+        console.error('无法放置所有诗句，重新开始');
+        this.initLevel();  // 重新尝试整个关卡
       }
     } catch (error) {
       console.error('初始化网格出错:', error);
     }
   }
 
-  getRandomStartPositions() {
-    const positions = [];
-    for (let i = 0; i < this.rows * this.cols; i++) {
-      positions.push({
-        row: Math.floor(i / this.cols),
-        col: i % this.cols
-      });
-    }
-    // 随机打乱位置
-    return positions.sort(() => Math.random() - 0.5);
-  }
-
-  tryPlacePoemInDirection(chars, startRow, startCol, dir1, dir2, usedPositions) {
-    let positions = [];
-    let currentRow = startRow;
-    let currentCol = startCol;
-
-    // 检查第一个字符位置
-    if (this.isPositionUsed(currentRow, currentCol, usedPositions)) {
-      return false;
-    }
-
-    positions.push({row: currentRow, col: currentCol});
-
-    // 为每个字符选择一个随机的相邻方向
-    for (let i = 1; i < chars.length; i++) {
-      // 获取所有可能的方向
-      const availableDirections = [
-        [-1, 0],  // 上
-        [1, 0],   // 下
-        [0, -1],  // 左
-        [0, 1]    // 右
-      ].filter(([dRow, dCol]) => {
-        const newRow = currentRow + dRow;
-        const newCol = currentCol + dCol;
-        return this.isValidPosition(newRow, newCol) && 
-               !this.isPositionUsed(newRow, newCol, usedPositions) &&
-               !positions.some(p => p.row === newRow && p.col === newCol);
-      });
-
-      // 如果没有可用方向，放置失败
-      if (availableDirections.length === 0) {
-        return false;
-      }
-
-      // 随机选择一个方向
-      const [dRow, dCol] = availableDirections[
-        Math.floor(Math.random() * availableDirections.length)
-      ];
-
-      currentRow += dRow;
-      currentCol += dCol;
-      positions.push({row: currentRow, col: currentCol});
-    }
-
-    // 检查最后一个字符是否与第一个字符相邻（如果是同一首诗的上下句）
-    if (chars.length > 5) {  // 假设超过5个字的是完整诗句
-      const halfLength = Math.floor(chars.length / 2);
-      const firstHalfEnd = positions[halfLength - 1];
-      const secondHalfStart = positions[halfLength];
-      
-      const isAdjacent = Math.abs(firstHalfEnd.row - secondHalfStart.row) +
-                        Math.abs(firstHalfEnd.col - secondHalfStart.col) === 1;
-      
-      if (!isAdjacent) {
-        return false;
-      }
-    }
-
-    // 如果所有字符都能放置，执行实际放置
+  tryPlacePoem(chars, startRow, startCol) {
+    // 记录尝试的路径
+    const path = [{row: startRow, col: startCol}];
+    const usedPositions = new Set([`${startRow},${startCol}`]);
+    
+    // 尝试放置每个字符
     for (let i = 0; i < chars.length; i++) {
-      const pos = positions[i];
-      this.grid[pos.row * this.cols + pos.col] = chars[i];
-      usedPositions.add(`${pos.row},${pos.col}`);
+      if (i === 0) {
+        this.grid[startRow * this.cols + startCol] = chars[i];
+        continue;
+      }
+
+      // 获取最后一个放置位置的相邻空格
+      const lastPos = path[path.length - 1];
+      const neighbors = this.getValidNeighbors(lastPos.row, lastPos.col, usedPositions);
+      
+      if (neighbors.length === 0) {
+        // 无法继续放置，恢复网格状态
+        path.forEach(pos => {
+          this.grid[pos.row * this.cols + pos.col] = ' ';
+        });
+        return false;
+      }
+
+      // 随机选择一个相邻位置
+      const nextPos = neighbors[Math.floor(Math.random() * neighbors.length)];
+      path.push(nextPos);
+      usedPositions.add(`${nextPos.row},${nextPos.col}`);
+      this.grid[nextPos.row * this.cols + nextPos.col] = chars[i];
     }
 
     return true;
   }
 
-  isValidPosition(row, col) {
-    return row >= 0 && row < this.rows && col >= 0 && col < this.cols;
-  }
+  getValidNeighbors(row, col, usedPositions) {
+    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];  // 上下左右
+    const neighbors = [];
 
-  canPlaceHalf(chars, startRow, startCol) {
-    let positions = [];
-    let currentRow = startRow;
-    let currentCol = startCol;
-
-    // 检查第一个位置
-    if (this.grid[currentRow * this.cols + currentCol] !== ' ') {
-      return false;
-    }
-    positions.push({row: currentRow, col: currentCol});
-
-    // 检查剩余字符
-    for (let i = 1; i < chars.length; i++) {
-      const adjacentPositions = this.getAdjacentPositions(currentRow, currentCol)
-        .filter(pos => !positions.some(p => p.row === pos.row && p.col === pos.col));
-
-      if (adjacentPositions.length === 0) {
-        return false;
-      }
-
-      const nextPos = adjacentPositions[Math.floor(Math.random() * adjacentPositions.length)];
-      currentRow = nextPos.row;
-      currentCol = nextPos.col;
-      positions.push({row: currentRow, col: currentCol});
-
-      if (this.grid[currentRow * this.cols + currentCol] !== ' ') {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  placeHalf(chars, startRow, startCol) {
-    let positions = [];
-    let currentRow = startRow;
-    let currentCol = startCol;
-
-    // 放置第一个字符
-    this.grid[currentRow * this.cols + currentCol] = chars[0];
-    positions.push({row: currentRow, col: currentCol});
-
-    // 放置剩余字符
-    for (let i = 1; i < chars.length; i++) {
-      const adjacentPositions = this.getAdjacentPositions(currentRow, currentCol)
-        .filter(pos => !positions.some(p => p.row === pos.row && p.col === pos.col));
-
-      if (adjacentPositions.length === 0) {
-        return positions; // 如果没有可用位置，返回已放置的位置
-      }
-
-      const nextPos = adjacentPositions[Math.floor(Math.random() * adjacentPositions.length)];
-      currentRow = nextPos.row;
-      currentCol = nextPos.col;
-      
-      this.grid[currentRow * this.cols + currentCol] = chars[i];
-      positions.push({row: currentRow, col: currentCol});
-    }
-
-    return positions;
-  }
-
-  getAdjacentPositions(row, col) {
-    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // 上下左右
-    return directions
-      .map(([dRow, dCol]) => ({
-        row: row + dRow,
-        col: col + dCol
-      }))
-      .filter(pos => 
-        pos.row >= 0 && pos.row < this.rows &&
-        pos.col >= 0 && pos.col < this.cols &&
-        this.grid[pos.row * this.cols + pos.col] === ' '
-      );
-  }
-
-  isPositionUsed(row, col, usedPositions) {
-    return usedPositions.has(`${row},${col}`);
-  }
-
-  canPlaceFullPoem(chars, startRow, startCol, usedPositions) {
-    // 检查起始位置
-    if (this.isPositionUsed(startRow, startCol, usedPositions)) {
-      return false;
-    }
-
-    let currentRow = startRow;
-    let currentCol = startCol;
-    const positions = [];
-
-    // 检查是否可以放置所有字符
-    for (let i = 0; i < chars.length; i++) {
-      if (this.isPositionUsed(currentRow, currentCol, usedPositions)) {
-        return false;
-      }
-      positions.push({ row: currentRow, col: currentCol });
-
-      if (i < chars.length - 1) {
-        const directions = this.getValidDirections(currentRow, currentCol, positions);
-        if (directions.length === 0) {
-          return false;
-        }
-        const direction = directions[Math.floor(Math.random() * directions.length)];
-        currentRow += direction[0];
-        currentCol += direction[1];
-      }
-    }
-
-    return true;
-  }
-
-  placeFullPoem(chars, startRow, startCol) {
-    let currentRow = startRow;
-    let currentCol = startCol;
-    const positions = [];
-
-    for (let i = 0; i < chars.length; i++) {
-      this.grid[currentRow * this.cols + currentCol] = chars[i];
-      positions.push({ row: currentRow, col: currentCol });
-
-      if (i < chars.length - 1) {
-        const directions = this.getValidDirections(currentRow, currentCol, positions);
-        const direction = directions[Math.floor(Math.random() * directions.length)];
-        currentRow += direction[0];
-        currentCol += direction[1];
-      }
-    }
-
-    return positions;
-  }
-
-  getValidDirections(row, col, usedPositions) {
-    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // 上下左右
-    return directions.filter(([dRow, dCol]) => {
+    for (const [dRow, dCol] of directions) {
       const newRow = row + dRow;
       const newCol = col + dCol;
-      return (
-        newRow >= 0 && newRow < this.rows &&
-        newCol >= 0 && newCol < this.cols &&
-        this.grid[newRow * this.cols + newCol] === ' ' &&  // 修改这里，检查空格而不是null
-        !usedPositions.some(pos => pos.row === newRow && pos.col === newCol)
-      );
-    });
+      
+      if (newRow >= 0 && newRow < this.rows &&
+          newCol >= 0 && newCol < this.cols &&
+          this.grid[newRow * this.cols + newCol] === ' ' &&
+          !usedPositions.has(`${newRow},${newCol}`)) {
+        neighbors.push({row: newRow, col: newCol});
+      }
+    }
+
+    return neighbors;
   }
 
   addToPath(cell) {
@@ -538,7 +414,7 @@ export default class DataBus {
 
     const selectedContent = this.currentPath
       .map(cell => cell.text)
-      .filter(text => text !== ' ')  // 过滤掉空格
+      .filter(text => text !== ' ')
       .join('');
 
     // 遍历所有未完成的诗句
@@ -547,16 +423,56 @@ export default class DataBus {
         continue;
       }
 
-      // 过滤掉标点符号后的诗句内容
       const poemContent = poem.content
         .split('')
         .filter(char => !/[，。、？！；：]/.test(char))
         .join('');
 
-      // 检查是否完全匹配
       if (selectedContent === poemContent) {
+        // 先更新分数和完成状态
         this.completedPoems.push(poem.id);
-        this.score += 1;
+        const levelBonus = this.level;
+        const points = 2 + levelBonus;
+        this.score += points;
+        this.currentLevelScore += points;
+
+        // 显示得分提示
+        wx.showToast({
+          title: `+${points}分`,
+          icon: 'none',
+          duration: 1000
+        });
+
+        // 检查是否完成所有诗句
+        if (this.completedPoems.length === this.poems.length) {
+          // 显示过关提示
+          wx.showToast({
+            title: `第${this.level}关完成！`,
+            icon: 'success',
+            duration: 1500
+          });
+
+          if (this.level < 5) {
+            // 立即清空当前网格显示
+            this.grid = new Array(this.rows * this.cols).fill(' ');
+            if (GameGlobal.grid) {
+              GameGlobal.grid.initGrid();
+            }
+
+            setTimeout(() => {
+              this.level++;
+              this.initLevel();  // 初始化新关卡
+              
+              wx.showToast({
+                title: `第${this.level}关开始！`,
+                icon: 'success',
+                duration: 1500
+              });
+            }, 1000);
+          } else {
+            this.isGameOver = true;
+          }
+        }
         return true;
       }
     }

@@ -51,17 +51,23 @@ export default class GameInfo extends Emitter {
   }
 
   renderGameScore(ctx) {
-    // 获取网格的起始位置
-    const gridStartY = GameGlobal.grid ? GameGlobal.grid.startY : 100;  // 提供默认值
+    const gridStartY = GameGlobal.grid ? GameGlobal.grid.startY : 100;
 
-    // 在网格上方显示得分
+    // 显示关卡和得分信息
     ctx.fillStyle = '#000000';
     ctx.font = 'bold 36px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(
-      '得分: ' + GameGlobal.databus.score,
+      `第${GameGlobal.databus.level}关`,
       SCREEN_WIDTH / 2,
-      gridStartY - 20  // 在网格上方20像素处显示得分
+      gridStartY - 40
+    );
+
+    ctx.font = 'bold 28px Arial';
+    ctx.fillText(
+      `总分: ${GameGlobal.databus.score}  本关: ${GameGlobal.databus.currentLevelScore}`,
+      SCREEN_WIDTH / 2,
+      gridStartY - 10
     );
 
     // 显示当前需要完成的诗句
@@ -99,11 +105,20 @@ export default class GameInfo extends Emitter {
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '30px Arial';
-    ctx.fillText(
-      '游戏结束',
-      SCREEN_WIDTH / 2 - 60,
-      SCREEN_HEIGHT / 2 - 30
-    );
+    
+    if (GameGlobal.databus.level > 5) {
+      ctx.fillText(
+        '恭喜通关！',
+        SCREEN_WIDTH / 2 - 60,
+        SCREEN_HEIGHT / 2 - 30
+      );
+    } else {
+      ctx.fillText(
+        '游戏结束',
+        SCREEN_WIDTH / 2 - 60,
+        SCREEN_HEIGHT / 2 - 30
+      );
+    }
 
     ctx.fillText(
       '最终得分: ' + GameGlobal.databus.score,
