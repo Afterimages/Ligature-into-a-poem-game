@@ -89,52 +89,33 @@ export default class DataBus {
 
   initGridData() {
     try {
-      // 初始化空网格，全部填充空格
+      // 初始化空网格
       this.grid = new Array(this.rows * this.cols).fill(' ');
       
-      // 记录所有已放置的位置
       const usedPositions = new Set();
       let retryCount = 0;
-      const maxRetries = 50;
+      const maxRetries = 200;  // 增加重试次数
 
       while (retryCount < maxRetries) {
-        // 清空网格重新开始
         this.grid = new Array(this.rows * this.cols).fill(' ');
         usedPositions.clear();
         let allPoemsPlaced = true;
 
-        // 尝试放置所有诗句
-        for (const poem of this.poems) {
+        // 随机打乱诗句顺序
+        const shuffledPoems = [...this.poems]
+          .sort(() => Math.random() - 0.5);
+
+        for (const poem of shuffledPoems) {
           const chars = poem.content.split('').filter(char => !/[，。、？！；：]/.test(char));
-          const halfLength = Math.floor(chars.length / 2);
-          const firstHalf = chars.slice(0, halfLength);
-          const secondHalf = chars.slice(halfLength);
-
           let placed = false;
-          let attempts = 0;
-          const maxAttempts = 100;
 
-          while (!placed && attempts < maxAttempts) {
-            attempts++;
-            const startRow = Math.floor(Math.random() * (this.rows - 3));
-            const startCol = Math.floor(Math.random() * (this.cols - 3));
-
-            if (this.canPlaceHalf(firstHalf, startRow, startCol)) {
-              const firstHalfPositions = this.placeHalf(firstHalf, startRow, startCol);
-              const lastPos = firstHalfPositions[firstHalfPositions.length - 1];
-              
-              const secondStartPositions = this.getAdjacentPositions(lastPos.row, lastPos.col);
-              
-              for (const pos of secondStartPositions) {
-                if (this.canPlaceHalf(secondHalf, pos.row, pos.col)) {
-                  this.placeHalf(secondHalf, pos.row, pos.col);
-                  placed = true;
-                  firstHalfPositions.forEach(pos => 
-                    usedPositions.add(`${pos.row},${pos.col}`)
-                  );
-                  break;
-                }
-              }
+          // 随机尝试多个起始位置
+          const startPositions = this.getRandomStartPositions();
+          
+          for (const {row, col} of startPositions) {
+            if (this.tryPlacePoemInDirection(chars, row, col, [0, 1], [1, 0], usedPositions)) {
+              placed = true;
+              break;
             }
           }
 
@@ -144,19 +125,95 @@ export default class DataBus {
           }
         }
 
-        if (allPoemsPlaced) {
-          // 所有诗句都放置成功，退出循环
-          break;
-        }
-
+        if (allPoemsPlaced) break;
         retryCount++;
-        if (retryCount === maxRetries) {
-          console.error('无法放置所有诗句，请调整网格大小或减少诗句数量');
-        }
       }
     } catch (error) {
       console.error('初始化网格出错:', error);
     }
+  }
+
+  getRandomStartPositions() {
+    const positions = [];
+    for (let i = 0; i < this.rows * this.cols; i++) {
+      positions.push({
+        row: Math.floor(i / this.cols),
+        col: i % this.cols
+      });
+    }
+    // 随机打乱位置
+    return positions.sort(() => Math.random() - 0.5);
+  }
+
+  tryPlacePoemInDirection(chars, startRow, startCol, dir1, dir2, usedPositions) {
+    let positions = [];
+    let currentRow = startRow;
+    let currentCol = startCol;
+
+    // 检查第一个字符位置
+    if (this.isPositionUsed(currentRow, currentCol, usedPositions)) {
+      return false;
+    }
+
+    positions.push({row: currentRow, col: currentCol});
+
+    // 为每个字符选择一个随机的相邻方向
+    for (let i = 1; i < chars.length; i++) {
+      // 获取所有可能的方向
+      const availableDirections = [
+        [-1, 0],  // 上
+        [1, 0],   // 下
+        [0, -1],  // 左
+        [0, 1]    // 右
+      ].filter(([dRow, dCol]) => {
+        const newRow = currentRow + dRow;
+        const newCol = currentCol + dCol;
+        return this.isValidPosition(newRow, newCol) && 
+               !this.isPositionUsed(newRow, newCol, usedPositions) &&
+               !positions.some(p => p.row === newRow && p.col === newCol);
+      });
+
+      // 如果没有可用方向，放置失败
+      if (availableDirections.length === 0) {
+        return false;
+      }
+
+      // 随机选择一个方向
+      const [dRow, dCol] = availableDirections[
+        Math.floor(Math.random() * availableDirections.length)
+      ];
+
+      currentRow += dRow;
+      currentCol += dCol;
+      positions.push({row: currentRow, col: currentCol});
+    }
+
+    // 检查最后一个字符是否与第一个字符相邻（如果是同一首诗的上下句）
+    if (chars.length > 5) {  // 假设超过5个字的是完整诗句
+      const halfLength = Math.floor(chars.length / 2);
+      const firstHalfEnd = positions[halfLength - 1];
+      const secondHalfStart = positions[halfLength];
+      
+      const isAdjacent = Math.abs(firstHalfEnd.row - secondHalfStart.row) +
+                        Math.abs(firstHalfEnd.col - secondHalfStart.col) === 1;
+      
+      if (!isAdjacent) {
+        return false;
+      }
+    }
+
+    // 如果所有字符都能放置，执行实际放置
+    for (let i = 0; i < chars.length; i++) {
+      const pos = positions[i];
+      this.grid[pos.row * this.cols + pos.col] = chars[i];
+      usedPositions.add(`${pos.row},${pos.col}`);
+    }
+
+    return true;
+  }
+
+  isValidPosition(row, col) {
+    return row >= 0 && row < this.rows && col >= 0 && col < this.cols;
   }
 
   canPlaceHalf(chars, startRow, startCol) {
