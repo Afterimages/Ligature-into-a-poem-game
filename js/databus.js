@@ -30,8 +30,43 @@ export default class DataBus {
         title: '登鹳雀楼',
         author: '王之涣',
         content: '白日依山尽，黄河入海流。'
+      },
+      {
+        id: 3,
+        title: '春晓',
+        author: '孟浩然',
+        content: '春眠不觉晓，处处闻啼鸟。'
+      },
+      {
+        id: 4,
+        title: '咏柳',
+        author: '贺知章',
+        content: '碧玉妆成一树高，万条垂下绿丝绦。'
+      },
+      {
+        id: 5,
+        title: '悯农',
+        author: '李绅',
+        content: '锄禾日当午，汗滴禾下土。'
+      },
+      {
+        id: 6,
+        title: '江雪',
+        author: '柳宗元',
+        content: '千山鸟飞绝，万径人踪灭。'
+      },
+      {
+        id: 7,
+        title: '望庐山瀑布',
+        author: '李白',
+        content: '日照香炉生紫烟，遥看瀑布挂前川。'
+      },
+      {
+        id: 8,
+        title: '鹿柴',
+        author: '王维',
+        content: '空山不见人，但闻人语响。'
       }
-      // 可以根据需要添加更多诗句
     ];
 
     // 计算所需的网格大小
@@ -46,55 +81,132 @@ export default class DataBus {
       return sum + chars.length;
     }, 0);
 
-    // 计算合适的网格大小，稍微增加一些空间
-    const size = Math.ceil(Math.sqrt(totalChars * 1.5));  // 增加50%的空间
-    this.rows = size;
-    this.cols = size;
+    // 设置更大的网格大小，使用固定的宽高比
+    this.cols = 12;  // 增加列数
+    this.rows = 15;  // 增加行数，使网格更高
   }
 
   initGridData() {
     try {
-      // 初始化空网格，使用空格填充
+      // 初始化空网格
       this.grid = new Array(this.rows * this.cols).fill(' ');
-      
-      // 记录已使用的位置
-      const usedPositions = new Set();
       
       // 处理每首诗
       for (const poem of this.poems) {
         const chars = poem.content.split('').filter(char => !/[，。、？！；：]/.test(char));
+        
+        // 将诗句分为上下两句
+        const halfLength = Math.floor(chars.length / 2);
+        const firstHalf = chars.slice(0, halfLength);
+        const secondHalf = chars.slice(halfLength);
+
         let placed = false;
         let attempts = 0;
-        const maxAttempts = 100;
+        const maxAttempts = 200;
 
         while (!placed && attempts < maxAttempts) {
           attempts++;
-          let startRow = Math.floor(Math.random() * (this.rows - 2));
-          let startCol = Math.floor(Math.random() * (this.cols - 2));
+          // 随机选择起始位置
+          const startRow = Math.floor(Math.random() * (this.rows - 3));
+          const startCol = Math.floor(Math.random() * (this.cols - 3));
 
-          if (this.canPlaceFullPoem(chars, startRow, startCol, usedPositions)) {
-            const newPositions = this.placeFullPoem(chars, startRow, startCol);
-            newPositions.forEach(pos => {
-              usedPositions.add(`${pos.row},${pos.col}`);
-            });
-            placed = true;
+          // 尝试放置第一句
+          if (this.canPlaceHalf(firstHalf, startRow, startCol)) {
+            const firstHalfPositions = this.placeHalf(firstHalf, startRow, startCol);
+            const lastPos = firstHalfPositions[firstHalfPositions.length - 1];
+            
+            // 从第一句的最后一个字开始，尝试放置第二句
+            const secondStartPositions = this.getAdjacentPositions(lastPos.row, lastPos.col);
+            
+            for (const pos of secondStartPositions) {
+              if (this.canPlaceHalf(secondHalf, pos.row, pos.col)) {
+                this.placeHalf(secondHalf, pos.row, pos.col);
+                placed = true;
+                break;
+              }
+            }
           }
-        }
-
-        if (!placed) {
-          console.log('增加网格大小并重试');
-          this.rows += 1;
-          this.cols += 1;
-          return this.initGridData();
         }
       }
     } catch (error) {
       console.error('初始化网格出错:', error);
-      // 设置一个基本的网格大小
-      this.rows = 6;
-      this.cols = 6;
-      this.grid = new Array(this.rows * this.cols).fill(' ');
     }
+  }
+
+  canPlaceHalf(chars, startRow, startCol) {
+    let positions = [];
+    let currentRow = startRow;
+    let currentCol = startCol;
+
+    // 检查第一个位置
+    if (this.grid[currentRow * this.cols + currentCol] !== ' ') {
+      return false;
+    }
+    positions.push({row: currentRow, col: currentCol});
+
+    // 检查剩余字符
+    for (let i = 1; i < chars.length; i++) {
+      const adjacentPositions = this.getAdjacentPositions(currentRow, currentCol)
+        .filter(pos => !positions.some(p => p.row === pos.row && p.col === pos.col));
+
+      if (adjacentPositions.length === 0) {
+        return false;
+      }
+
+      const nextPos = adjacentPositions[Math.floor(Math.random() * adjacentPositions.length)];
+      currentRow = nextPos.row;
+      currentCol = nextPos.col;
+      positions.push({row: currentRow, col: currentCol});
+
+      if (this.grid[currentRow * this.cols + currentCol] !== ' ') {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  placeHalf(chars, startRow, startCol) {
+    let positions = [];
+    let currentRow = startRow;
+    let currentCol = startCol;
+
+    // 放置第一个字符
+    this.grid[currentRow * this.cols + currentCol] = chars[0];
+    positions.push({row: currentRow, col: currentCol});
+
+    // 放置剩余字符
+    for (let i = 1; i < chars.length; i++) {
+      const adjacentPositions = this.getAdjacentPositions(currentRow, currentCol)
+        .filter(pos => !positions.some(p => p.row === pos.row && p.col === pos.col));
+
+      if (adjacentPositions.length === 0) {
+        return positions; // 如果没有可用位置，返回已放置的位置
+      }
+
+      const nextPos = adjacentPositions[Math.floor(Math.random() * adjacentPositions.length)];
+      currentRow = nextPos.row;
+      currentCol = nextPos.col;
+      
+      this.grid[currentRow * this.cols + currentCol] = chars[i];
+      positions.push({row: currentRow, col: currentCol});
+    }
+
+    return positions;
+  }
+
+  getAdjacentPositions(row, col) {
+    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // 上下左右
+    return directions
+      .map(([dRow, dCol]) => ({
+        row: row + dRow,
+        col: col + dCol
+      }))
+      .filter(pos => 
+        pos.row >= 0 && pos.row < this.rows &&
+        pos.col >= 0 && pos.col < this.cols &&
+        this.grid[pos.row * this.cols + pos.col] === ' '
+      );
   }
 
   isPositionUsed(row, col, usedPositions) {

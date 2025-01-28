@@ -51,14 +51,17 @@ export default class GameInfo extends Emitter {
   }
 
   renderGameScore(ctx) {
-    // 在屏幕顶部居中显示得分
+    // 获取网格的起始位置
+    const gridStartY = GameGlobal.grid ? GameGlobal.grid.startY : 100;  // 提供默认值
+
+    // 在网格上方显示得分
     ctx.fillStyle = '#000000';
     ctx.font = 'bold 36px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(
       '得分: ' + GameGlobal.databus.score,
       SCREEN_WIDTH / 2,
-      50
+      gridStartY - 20  // 在网格上方20像素处显示得分
     );
 
     // 显示当前需要完成的诗句

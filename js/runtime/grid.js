@@ -16,20 +16,39 @@ export default class Grid {
     this.rows = GameGlobal.databus.rows;
     this.cols = GameGlobal.databus.cols;
     this.cells = [];
-    this.cellSize = Math.min(
-      (SCREEN_WIDTH / this.cols),
-      ((SCREEN_HEIGHT - 150) / this.rows)
-    );
+    
+    // 计算合适的格子大小和位置
+    this.calculateGridDimensions();
     this.initGrid();
+  }
+
+  calculateGridDimensions() {
+    // 设置网格的理想尺寸（整体占屏幕的70-80%）
+    const screenRatio = 0.75;
+    const padding = 20;  // 边距
+
+    // 计算可用空间
+    const availableWidth = SCREEN_WIDTH - (padding * 2);
+    const availableHeight = SCREEN_HEIGHT - (padding * 2);
+
+    // 计算单个格子的大小
+    this.cellSize = Math.min(
+      availableWidth / this.cols,
+      availableHeight / this.rows
+    );
+
+    // 计算整个网格的尺寸
+    this.gridWidth = this.cellSize * this.cols;
+    this.gridHeight = this.cellSize * this.rows;
+
+    // 计算网格的起始位置（居中）
+    this.startX = (SCREEN_WIDTH - this.gridWidth) / 2;
+    this.startY = (SCREEN_HEIGHT - this.gridHeight) / 2;
   }
 
   initGrid() {
     const characters = GameGlobal.databus.grid;
     this.cells = [];
-
-    // 计算起始位置，使格子矩阵水平居中
-    const startX = (SCREEN_WIDTH - this.cols * this.cellSize) / 2;
-    const startY = 80; // 顶部留出80像素的空间
 
     for (let row = 0; row < this.rows; row++) {
       for (let col = 0; col < this.cols; col++) {
@@ -37,8 +56,8 @@ export default class Grid {
         this.cells.push({
           row,
           col,
-          x: startX + col * this.cellSize,
-          y: startY + row * this.cellSize,
+          x: this.startX + col * this.cellSize,
+          y: this.startY + row * this.cellSize,
           text: characters[index],
           selected: false,
           matched: false
@@ -112,9 +131,9 @@ export default class Grid {
       ctx.strokeRect(cell.x, cell.y, this.cellSize, this.cellSize);
       
       // 绘制文字
-      if (cell.text) {
+      if (cell.text && cell.text !== ' ') {
         ctx.fillStyle = cell.matched ? '#006400' : '#000000';
-        ctx.font = '24px Arial';
+        ctx.font = `${this.cellSize * 0.6}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(

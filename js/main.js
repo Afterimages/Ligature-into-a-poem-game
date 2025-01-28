@@ -56,6 +56,7 @@ export default class Main {
     
     // 初始化游戏网格
     this.grid = new Grid();
+    GameGlobal.grid = this.grid;  // 保存grid实例到GameGlobal
     
     // 初始化游戏信息
     this.gameinfo = new GameInfo();
