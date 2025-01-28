@@ -307,10 +307,22 @@ export default class DataBus {
       return sum + chars.length;
     }, 0);
 
-    // 根据字数动态计算网格大小
-    const minSize = Math.ceil(Math.sqrt(totalChars * 1.5)); // 增加50%的空间
-    this.cols = Math.max(10, minSize);  // 最小10列
-    this.rows = Math.max(12, minSize + 2);  // 最小12行，比列数多2行
+    // 获取屏幕信息
+    const systemInfo = wx.getSystemInfoSync();
+    // 假设每个格子大小为32px，再加上间距4px
+    const cellSize = 36;  // 32 + 4
+    // 计算屏幕能容纳的最大列数（留出左右边距）
+    const maxCols = Math.floor((systemInfo.windowWidth - 20) / cellSize);  // 20是左右各10px的边距
+
+    // 根据字数和屏幕宽度计算网格大小
+    const minRows = Math.ceil(totalChars / maxCols);  // 最少需要的行数
+    
+    // 设置网格大小
+    this.cols = Math.min(maxCols, 10);  // 限制最大列数为10
+    this.rows = Math.max(minRows, 12);  // 最小12行，确保有足够空间
+    
+    console.log(`屏幕宽度: ${systemInfo.windowWidth}px`);
+    console.log(`计算得到网格大小: ${this.rows}行 x ${this.cols}列`);
   }
 
   // 添加一个辅助方法来打印网格
