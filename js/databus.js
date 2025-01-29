@@ -5,6 +5,18 @@ export default class DataBus {
     if (instance) return instance;
     instance = this;
     this.reset();
+    // 添加颜色数组，使用更鲜明的颜色
+    this.colors = [
+      '#45B7D1',  // 蓝色
+      '#FF6B6B',  // 红色
+      '#FFB800',  // 橙色
+      '#4CAF50',  // 绿色
+      '#9C27B0',  // 紫色
+      '#FF5722',  // 深橙色
+      '#2196F3',  // 天蓝色
+      '#E91E63'   // 粉色
+    ];
+    this.completedPoemColors = new Map();
   }
 
   reset() {
@@ -14,6 +26,7 @@ export default class DataBus {
     this.grid = [];
     this.currentPath = [];
     this.completedPoems = [];
+    this.completedPoemColors = new Map();  // 重置颜色映射
     this.score = 0;  // 总分
     this.currentLevelScore = 0;  // 当前关卡得分
     this.isGameOver = false;
@@ -258,6 +271,9 @@ export default class DataBus {
     this.currentLevelScore = 0;
     this.poems = [];  // 清空当前诗句
     this.poemPlacements = new Map();  // 确保清除旧的位置记录
+    
+    // 重置颜色映射
+    this.completedPoemColors = new Map();
     
     // 随机选择诗句
     let availablePoems = this.allPoems.filter(poem => !this.usedPoemIds.has(poem.id));
@@ -740,6 +756,8 @@ export default class DataBus {
       .filter(text => text !== ' ')
       .join('');
 
+    console.log('检查路径匹配:', selectedContent);
+
     // 遍历所有未完成的诗句
     for (const poem of this.poems) {
       if (this.completedPoems.includes(poem.id)) {
@@ -752,7 +770,28 @@ export default class DataBus {
         .join('');
 
       if (selectedContent === poemContent) {
-        // 先更新分数和完成状态
+        console.log('找到匹配的诗句:', poem.content);
+
+        // 为完成的诗句分配一个颜色
+        const unusedColors = this.colors.filter(color => 
+          !Array.from(this.completedPoemColors.values()).includes(color)
+        );
+        const colorIndex = this.completedPoems.length % this.colors.length;
+        const color = unusedColors[0] || this.colors[colorIndex];
+        
+        console.log(`为诗句ID:${poem.id} 分配颜色:${color}`);
+        this.completedPoemColors.set(poem.id, color);
+
+        // 记录这个诗句的位置
+        const positions = this.currentPath.map(cell => ({
+          row: cell.row,
+          col: cell.col
+        }));
+        
+        console.log('记录的位置:', positions);
+        this.poemPlacements.set(poemContent, positions);
+
+        // 更新分数和完成状态
         this.completedPoems.push(poem.id);
         const levelBonus = this.level;
         const points = 2 + levelBonus;
@@ -775,21 +814,17 @@ export default class DataBus {
             duration: 1500
           });
 
-          if (this.level < 5) {
-            this.printGrid('过关前的最后网格状态');
-            
-            // 确保同步清空两个网格
+          if (this.level < 5) {  // 假设总共有5关
+            // 确保同步清空网格
             this.grid = new Array(this.rows * this.cols).fill(' ');
             if (GameGlobal.grid) {
               GameGlobal.grid.data = [...this.grid];
               GameGlobal.grid.initGrid();
             }
-            
-            this.printGrid('清空后的网格状态');
 
             setTimeout(() => {
               this.level++;
-              // 确保新关卡初始化时两个网格同步
+              // 初始化新关卡
               this.initLevel();
               
               wx.showToast({
@@ -802,6 +837,12 @@ export default class DataBus {
             this.isGameOver = true;
           }
         }
+
+        // 强制重新渲染网格
+        if (GameGlobal.grid) {
+          GameGlobal.grid.render();
+        }
+
         return true;
       }
     }
@@ -844,5 +885,19 @@ export default class DataBus {
         charCount.set(char, (charCount.get(char) || 0) + 1);
       }
     }
+  }
+
+  isPartOfCompletedPoem(cell, poemId) {
+    const poem = this.poems.find(p => p.id === poemId);
+    if (!poem) return false;
+
+    const chars = poem.content.split('').filter(char => !/[，。、？！；：]/.test(char));
+    const poemKey = chars.join('');
+    const positions = this.poemPlacements.get(poemKey);
+
+    return positions && positions.some(pos => 
+      pos.row === cell.row && 
+      pos.col === cell.col
+    );
   }
 } 

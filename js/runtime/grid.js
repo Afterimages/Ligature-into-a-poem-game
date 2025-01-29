@@ -16,6 +16,12 @@ export default class Grid {
     this.rows = GameGlobal.databus.rows;
     this.cols = GameGlobal.databus.cols;
     this.cells = [];
+    this.cellSize = 32;  // 每个格子的大小
+    this.padding = 4;    // 格子之间的间距
+    this.data = [];      // 网格数据
+    this.startX = 10;    // 起始X坐标（左边距）
+    this.startY = 60;    // 起始Y坐标（顶部边距，为标题留空间）
+    this.currentPath = [];  // 当前选中的路径
     
     // 计算合适的格子大小和位置
     this.calculateGridDimensions();
@@ -49,6 +55,7 @@ export default class Grid {
   initGrid() {
     const characters = GameGlobal.databus.grid;
     this.cells = [];
+    this.data = [...characters];  // 保存网格数据的副本
 
     for (let row = 0; row < this.rows; row++) {
       for (let col = 0; col < this.cols; col++) {
@@ -113,38 +120,64 @@ export default class Grid {
 
     // 绘制每个格子
     this.cells.forEach(cell => {
-      // 设置格子背景色
-      if (cell.matched) {
-        ctx.fillStyle = '#90EE90';
-      } else if (cell.selected) {
-        ctx.fillStyle = '#e6ccff';
-      } else {
-        ctx.fillStyle = '#ffffff';
-      }
-      
-      // 绘制格子背景
-      ctx.fillRect(cell.x, cell.y, this.cellSize, this.cellSize);
-      
-      // 绘制格子边框
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(cell.x, cell.y, this.cellSize, this.cellSize);
-      
-      // 绘制文字
-      if (cell.text && cell.text !== ' ') {
-        ctx.fillStyle = cell.matched ? '#006400' : '#000000';
-        ctx.font = `${this.cellSize * 0.6}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(
-          cell.text,
-          cell.x + this.cellSize / 2,
-          cell.y + this.cellSize / 2
-        );
-      }
+      const color = this.getCellColor(cell);
+      this.drawCell(ctx, cell, color);
     });
 
     // 绘制选择路径
+    this.drawSelectionPath(ctx);
+  }
+
+  getCellColor(cell) {
+    // 获取完成诗句的颜色
+    for (const [poemId, poemColor] of GameGlobal.databus.completedPoemColors) {
+      if (GameGlobal.databus.isPartOfCompletedPoem({
+        row: cell.row,
+        col: cell.col,
+        text: cell.text
+      }, poemId)) {
+        return poemColor;
+      }
+    }
+    return null;
+  }
+
+  drawCell(ctx, cell, color) {
+    const x = cell.x;
+    const y = cell.y;
+
+    // 绘制背景
+    if (cell.selected) {
+      ctx.fillStyle = '#E3E3E3';
+    } else if (color) {
+      ctx.fillStyle = color + '33';  // 33表示20%不透明度
+      // 使用指定的颜色绘制边框
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+    } else {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+    }
+    
+    ctx.fillRect(x, y, this.cellSize, this.cellSize);
+    ctx.strokeRect(x, y, this.cellSize, this.cellSize);
+
+    // 绘制文字
+    if (cell.text && cell.text !== ' ') {
+      ctx.font = `${this.cellSize * 0.6}px Arial`;
+      ctx.fillStyle = (!cell.selected && color) ? color : '#000000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(
+        cell.text,
+        x + this.cellSize / 2,
+        y + this.cellSize / 2
+      );
+    }
+  }
+
+  drawSelectionPath(ctx) {
     const currentPath = GameGlobal.databus.currentPath;
     if (currentPath && currentPath.length > 1) {
       ctx.beginPath();
