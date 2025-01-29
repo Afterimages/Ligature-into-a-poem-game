@@ -25,6 +25,21 @@ export default class Main {
   }
 
   restart() {
+    // 确保清理之前的状态
+    if (this.aniId) {
+      cancelAnimationFrame(this.aniId);
+      this.aniId = null;
+    }
+    
+    // 解绑之前的事件处理器
+    try {
+      wx.offTouchStart();
+      wx.offTouchMove();
+      wx.offTouchEnd();
+    } catch (error) {
+      console.warn('清理事件监听器失败:', error);
+    }
+
     this.bindLoop = this.loop.bind(this);
     
     // 初始化数据总线
@@ -40,10 +55,10 @@ export default class Main {
     // 初始化游戏信息
     this.gameinfo = new GameInfo();
     
-    // 绑定事件
+    // 重新绑定事件
     this.bindEvents();
     
-    // 开始游戏循环
+    // 开始新的游戏循环
     this.loop();
   }
 
@@ -100,16 +115,40 @@ export default class Main {
 
   loop() {
     try {
+      // 先取消之前的动画帧
       if (this.aniId) {
         cancelAnimationFrame(this.aniId);
         this.aniId = null;
       }
 
-      this.render();
-      this.aniId = window.requestAnimationFrame(this.bindLoop);
+      // 确保游戏状态正常才继续循环
+      if (!GameGlobal.databus.isGameOver) {
+        this.render();
+        this.aniId = requestAnimationFrame(this.bindLoop);
+      } else {
+        this.render(); // 渲染最后一帧
+      }
     } catch (error) {
       console.error('Game loop error:', error);
-      this.restart();
+      // 避免无限重启
+      if (!this.isRestarting) {
+        this.isRestarting = true;
+        setTimeout(() => {
+          this.isRestarting = false;
+          this.restart();
+        }, 1000);
+      }
     }
+  }
+
+  init() {
+    // 添加事件监听器时保存引用
+    this.boundHandler = this.handleEvent.bind(this)
+    someEmitter.on('event', this.boundHandler)
+  }
+
+  destroy() {
+    // 在组件销毁时移除事件监听器
+    someEmitter.off('event', this.boundHandler)
   }
 }

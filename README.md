@@ -163,3 +163,53 @@ checkPathMatch() 添加同步
 
 
 2025/1/29 修复：删除冗余代码
+
+2025/1/29 修复bug：在真机上无响应
+过程：
+1）真机运行，后台点击调试，控制台返回调用栈溢出的问题（Maximum call stack size exceeded）。怀疑问题可能在游戏循环和事件处理。在main中添加错误处理，确保在错误发生时不会导致崩溃。
+在restart方法添加
+```javascript
+// 确保清理之前的状态
+    if (this.aniId) {
+      cancelAnimationFrame(this.aniId);
+      this.aniId = null;
+    }
+    
+    // 解绑之前的事件处理器
+    try {
+      wx.offTouchStart();
+      wx.offTouchMove();
+      wx.offTouchEnd();
+    } catch (error) {
+      console.warn('清理事件监听器失败:', error);
+    }
+
+```
+loop() 方法中
+```javascript
+try {
+      // 先取消之前的动画帧
+      if (this.aniId) {
+        cancelAnimationFrame(this.aniId);
+        this.aniId = null;
+      }
+
+      // 确保游戏状态正常才继续循环
+      if (!GameGlobal.databus.isGameOver) {
+        this.render();
+        this.aniId = requestAnimationFrame(this.bindLoop);
+      } else {
+        this.render(); // 渲染最后一帧
+      }
+    } catch (error) {
+      console.error('Game loop error:', error);
+      // 避免无限重启
+      if (!this.isRestarting) {
+        this.isRestarting = true;
+        setTimeout(() => {
+          this.isRestarting = false;
+          this.restart();
+        }, 1000);
+      }
+    }
+```
