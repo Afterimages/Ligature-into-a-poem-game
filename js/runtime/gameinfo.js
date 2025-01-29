@@ -13,15 +13,10 @@
  * 继承自事件发射器以支持UI事件
  */
 
-import Emitter from '../libs/tinyemitter';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
 
-const atlas = wx.createImage();
-atlas.src = 'images/Common.png';
-
-export default class GameInfo extends Emitter {
+export default class GameInfo {
   constructor() {
-    super();
 
     this.btnArea = {
       startX: SCREEN_WIDTH / 2 - 40,

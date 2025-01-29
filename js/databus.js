@@ -850,39 +850,10 @@ export default class DataBus {
   }
 
   fillRemainingSpaces() {
-    // 定义可用的填充字符
-    const additionalChars = [
-      '山', '水', '风', '云', '雨', '日', '月', '星',
-      '天', '地', '春', '夏', '秋', '冬', '花', '草',
-      '木', '竹', '松', '梅', '兰', '菊', '雪', '霜'
-    ];
-
-    // 统计已使用的字符
-    const charCount = new Map();
-    for (let i = 0; i < this.grid.length; i++) {
-      const char = this.grid[i];
-      if (char) {
-        charCount.set(char, (charCount.get(char) || 0) + 1);
-      }
-    }
-
-    // 填充剩余空格
+    // 将所有未使用的格子设置为空格
     for (let i = 0; i < this.grid.length; i++) {
       if (this.grid[i] === null) {
-        // 过滤掉使用次数过多的字符
-        const availableChars = additionalChars.filter(char => 
-          !charCount.has(char) || charCount.get(char) < 2
-        );
-
-        // 如果没有可用字符，使用完整列表
-        const charPool = availableChars.length > 0 ? availableChars : additionalChars;
-        
-        // 随机选择一个字符
-        const char = charPool[Math.floor(Math.random() * charPool.length)];
-        this.grid[i] = char;
-        
-        // 更新计数
-        charCount.set(char, (charCount.get(char) || 0) + 1);
+        this.grid[i] = ' ';
       }
     }
   }

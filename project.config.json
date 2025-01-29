@@ -15,7 +15,7 @@
   "compileType": "game",
   "libVersion": "latest",
   "appid": "wx56018b6baf461d76",
-  "projectname": "poetry-link",
+  "projectname": "连字成诗",
   "condition": {},
   "packOptions": {
     "ignore": [],
