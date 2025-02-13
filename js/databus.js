@@ -1,3 +1,6 @@
+/**
+ * 已拆分，禁用中
+ */
 let instance;
 
 export default class DataBus {
