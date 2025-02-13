@@ -1,5 +1,5 @@
 import { canvas } from './render';
-import DataBus from './databus';
+import DataBus from './databus/index.js';
 import Grid from './runtime/grid';
 import GameInfo from './runtime/gameinfo';
 import Music from './runtime/music';
