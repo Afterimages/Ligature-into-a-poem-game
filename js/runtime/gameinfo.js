@@ -17,16 +17,8 @@ import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
 
 export default class GameInfo {
   constructor() {
-
-    this.btnArea = {
-      startX: SCREEN_WIDTH / 2 - 40,
-      startY: SCREEN_HEIGHT / 2 - 100 + 180,
-      endX: SCREEN_WIDTH / 2 + 50,
-      endY: SCREEN_HEIGHT / 2 - 100 + 255,
-    };
-
-    // 绑定触摸事件
-    wx.onTouchStart(this.touchEventHandler.bind(this))
+    // 移除 btnArea，因为现在整个屏幕都可以点击
+    // 移除 touchEventHandler 绑定
   }
 
   setFont(ctx) {
@@ -69,7 +61,6 @@ export default class GameInfo {
     this.renderNextPoem(ctx);
   }
 
-  // 显示下一句要完成的诗句
   renderNextPoem(ctx) {
     const nextPoem = GameGlobal.databus.poems.find(poem => 
       !GameGlobal.databus.completedPoems.includes(poem.id)
@@ -95,54 +86,31 @@ export default class GameInfo {
   }
 
   renderGameOver(ctx) {
+    // 添加半透明黑色背景
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '30px Arial';
+    ctx.textAlign = 'center';  // 使用文字居中对齐
     
-    if (GameGlobal.databus.level > 5) {
-      ctx.fillText(
-        '恭喜通关！',
-        SCREEN_WIDTH / 2 - 60,
-        SCREEN_HEIGHT / 2 - 30
-      );
-    } else {
-      ctx.fillText(
-        '游戏结束',
-        SCREEN_WIDTH / 2 - 60,
-        SCREEN_HEIGHT / 2 - 30
-      );
-    }
+    // 居中显示文本
+    ctx.fillText(
+      '游戏完成！',
+      SCREEN_WIDTH / 2,
+      SCREEN_HEIGHT / 2 - 30
+    );
 
     ctx.fillText(
       '最终得分: ' + GameGlobal.databus.score,
-      SCREEN_WIDTH / 2 - 90,
+      SCREEN_WIDTH / 2,
       SCREEN_HEIGHT / 2 + 30
     );
 
     ctx.fillText(
       '点击屏幕重新开始',
-      SCREEN_WIDTH / 2 - 100,
+      SCREEN_WIDTH / 2,
       SCREEN_HEIGHT / 2 + 90
     );
-  }
-
-  touchEventHandler(event) {
-    const { clientX, clientY } = event.touches[0]; // 获取触摸点的坐标
-
-    // 当前只有游戏结束时展示了UI，所以只处理游戏结束时的状态
-    if (GameGlobal.databus.isGameOver) {
-      // 检查触摸是否在按钮区域内
-      if (
-        clientX >= this.btnArea.startX &&
-        clientX <= this.btnArea.endX &&
-        clientY >= this.btnArea.startY &&
-        clientY <= this.btnArea.endY
-      ) {
-        // 调用重启游戏的回调函数
-        this.emit('restart');
-      }
-    }
   }
 }

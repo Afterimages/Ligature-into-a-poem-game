@@ -21,34 +21,39 @@ export default class Main {
     }
     
     this.aniId = 0;
+    // 绑定事件处理函数到实例
+    this.onTouchStartHandler = this.onTouchStart.bind(this);
+    this.onTouchMoveHandler = this.onTouchMove.bind(this);
+    this.onTouchEndHandler = this.onTouchEnd.bind(this);
+    
     this.restart();
   }
 
   restart() {
+    console.log('=== 开始执行重启 ===');
     // 确保清理之前的状态
     if (this.aniId) {
       cancelAnimationFrame(this.aniId);
       this.aniId = null;
     }
     
-    // 解绑之前的事件处理器
-    try {
-      wx.offTouchStart();
-      wx.offTouchMove();
-      wx.offTouchEnd();
-    } catch (error) {
-      console.warn('清理事件监听器失败:', error);
-    }
+    // 解绑事件
+    this.unbindEvents();
 
     this.bindLoop = this.loop.bind(this);
     
+    // 清除旧的 DataBus 实例
+    DataBus.clearInstance();
+    
     // 初始化数据总线
+    console.log('重新初始化数据总线');
     GameGlobal.databus = new DataBus();
     
     // 初始化音乐管理器
     GameGlobal.musicManager = new Music();
     
     // 初始化游戏网格
+    console.log('重新初始化游戏网格');
     this.grid = new Grid();
     GameGlobal.grid = this.grid;
     
@@ -59,20 +64,48 @@ export default class Main {
     this.bindEvents();
     
     // 开始新的游戏循环
+    console.log('=== 重启完成，开始新的游戏循环 ===');
     this.loop();
   }
 
   bindEvents() {
     try {
-      wx.onTouchStart(this.onTouchStart.bind(this));
-      wx.onTouchMove(this.onTouchMove.bind(this));
-      wx.onTouchEnd(this.onTouchEnd.bind(this));
+      // 先解绑所有事件
+      this.unbindEvents();
+      
+      // 使用保存的处理函数绑定事件
+      wx.onTouchStart(this.onTouchStartHandler);
+      wx.onTouchMove(this.onTouchMoveHandler);
+      wx.onTouchEnd(this.onTouchEndHandler);
+      
+      console.log('事件绑定完成');
     } catch (error) {
       console.error('Failed to bind touch events:', error);
     }
   }
 
+  unbindEvents() {
+    try {
+      wx.offTouchStart(this.onTouchStartHandler);
+      wx.offTouchMove(this.onTouchMoveHandler);
+      wx.offTouchEnd(this.onTouchEndHandler);
+      console.log('事件解绑完成');
+    } catch (error) {
+      console.warn('清理事件监听器失败:', error);
+    }
+  }
+
   onTouchStart(e) {
+    // 如果游戏结束，点击任意位置重新开始
+    if (GameGlobal.databus.isGameOver) {
+      console.log('检测到游戏结束状态，准备重启');
+      console.log('当前 isGameOver:', GameGlobal.databus.isGameOver);
+      this.restart();
+      console.log('重启后 isGameOver:', GameGlobal.databus.isGameOver);
+      return;
+    }
+    
+    // 正常游戏中的触摸处理
     const touch = e.touches[0];
     const cell = this.grid.getCellByTouch(touch);
     if (cell && cell.text) {
@@ -103,13 +136,12 @@ export default class Main {
   }
 
   render() {
-    if (GameGlobal.databus.isGameOver) {
-      this.gameinfo.render(ctx);
-      return;
-    }
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 先渲染游戏网格
     this.grid.render(ctx);
+    
+    // 再渲染游戏信息（确保在最上层）
     this.gameinfo.render(ctx);
   }
 
@@ -121,13 +153,12 @@ export default class Main {
         this.aniId = null;
       }
 
-      // 确保游戏状态正常才继续循环
-      if (!GameGlobal.databus.isGameOver) {
-        this.render();
-        this.aniId = requestAnimationFrame(this.bindLoop);
-      } else {
-        this.render(); // 渲染最后一帧
-      }
+      // 无论游戏状态如何都要渲染
+      this.render();
+      
+      // 继续请求下一帧
+      this.aniId = requestAnimationFrame(this.bindLoop);
+      
     } catch (error) {
       console.error('Game loop error:', error);
       // 避免无限重启
